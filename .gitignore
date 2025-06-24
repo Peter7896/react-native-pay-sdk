@@ -42,8 +42,7 @@ android.iml
 
 # Cocoapods
 #
-example/ios/Pods
-example-new-architecture/ios/Pods
+**/Pods/
 
 # Ruby
 example/vendor/
@@ -73,6 +72,18 @@ lib/
 
 # Android
 credentials.properties
+cardinal.properties
 
 # iOS
-.xcode.env.local
+**/.xcode.env.local
+
+# testing
+/coverage
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
