@@ -28,10 +28,23 @@ type NativeModule = {
   startSetupFlow: jest.Mock;
 };
 
-function loadSdk(nativeModule?: NativeModule) {
+type LoadSdkOptions = {
+  nativeModule?: NativeModule;
+  isTurboModuleEnabled?: boolean;
+};
+
+const ARCHITECTURES = [
+  { name: 'Legacy Bridge', isTurboModuleEnabled: false },
+  { name: 'TurboModule', isTurboModuleEnabled: true },
+] as const;
+
+function loadSdk({
+  nativeModule,
+  isTurboModuleEnabled = false,
+}: LoadSdkOptions = {}) {
   jest.resetModules();
   // @ts-expect-error test-only override
-  global.__turboModuleProxy = null;
+  global.__turboModuleProxy = isTurboModuleEnabled ? {} : null;
 
   jest.doMock('react-native', () => ({
     NativeModules: nativeModule ? { DojoReactNativePaySdk: nativeModule } : {},
@@ -47,7 +60,7 @@ function loadSdk(nativeModule?: NativeModule) {
   return require('../index') as typeof import('../index');
 }
 
-describe('public SDK contract', () => {
+describe.each(ARCHITECTURES)('public SDK contract ($name)', (architecture) => {
   afterEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
@@ -58,8 +71,11 @@ describe('public SDK contract', () => {
 
   it('exposes the full ResultCode enum without missing values', () => {
     const { ResultCode } = loadSdk({
-      startPaymentFlow: jest.fn(),
-      startSetupFlow: jest.fn(),
+      nativeModule: {
+        startPaymentFlow: jest.fn(),
+        startSetupFlow: jest.fn(),
+      },
+      isTurboModuleEnabled: architecture.isTurboModuleEnabled,
     });
 
     const actualEntries = Object.entries(ResultCode).filter(
@@ -75,7 +91,10 @@ describe('public SDK contract', () => {
       startPaymentFlow: jest.fn().mockResolvedValue(3),
       startSetupFlow: jest.fn(),
     };
-    const { startPaymentFlow, ResultCode } = loadSdk(nativeModule);
+    const { startPaymentFlow, ResultCode } = loadSdk({
+      nativeModule,
+      isTurboModuleEnabled: architecture.isTurboModuleEnabled,
+    });
 
     await expect(startPaymentFlow(PAYMENT_DETAILS)).resolves.toBe(
       ResultCode.authorizing
@@ -88,7 +107,10 @@ describe('public SDK contract', () => {
       startPaymentFlow: jest.fn(),
       startSetupFlow: jest.fn().mockResolvedValue(0),
     };
-    const { startSetupFlow, ResultCode } = loadSdk(nativeModule);
+    const { startSetupFlow, ResultCode } = loadSdk({
+      nativeModule,
+      isTurboModuleEnabled: architecture.isTurboModuleEnabled,
+    });
 
     await expect(startSetupFlow(PAYMENT_DETAILS)).resolves.toBe(
       ResultCode.successful
@@ -97,7 +119,9 @@ describe('public SDK contract', () => {
   });
 
   it('throws the linking error when startPaymentFlow is unavailable', () => {
-    const { startPaymentFlow } = loadSdk();
+    const { startPaymentFlow } = loadSdk({
+      isTurboModuleEnabled: architecture.isTurboModuleEnabled,
+    });
 
     expect(() => startPaymentFlow(PAYMENT_DETAILS)).toThrow(
       "@dojo-engineering/react-native-pay-sdk' doesn't seem to be linked"
@@ -108,7 +132,9 @@ describe('public SDK contract', () => {
   });
 
   it('throws the linking error when startSetupFlow is unavailable', () => {
-    const { startSetupFlow } = loadSdk();
+    const { startSetupFlow } = loadSdk({
+      isTurboModuleEnabled: architecture.isTurboModuleEnabled,
+    });
 
     expect(() => startSetupFlow(PAYMENT_DETAILS)).toThrow(
       "@dojo-engineering/react-native-pay-sdk' doesn't seem to be linked"
